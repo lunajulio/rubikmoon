@@ -30,7 +30,7 @@ COLOR_TO_LETTER = {
     '#3b21e4': 'D',  # BLUED
     '#8a1aee': 'P',  # PURPLE
     '#8c8cd4': 'C',  # CLARITO
-    '#000000': '0'   # GRAY (espacio vacío)
+    '#000000': '*'   # GRAY (espacio vacío)
 }
 
 LETTER_TO_COLOR = {v: k for k, v in COLOR_TO_LETTER.items()}
@@ -121,57 +121,49 @@ class state:
         # If f_scores are equal, compare h_scores
         return self.h_n < other_state.h_n
 
-def a_star(start, goal, heuristic):
-    # cerates initial state with g(n) = 0
+def a_star(start, goal, heuristic, time_limit=100):  # Agregamos el parámetro time_limit
+    start_time = time.time()  # Registramos el tiempo de inicio
+    
     start_state = state(start, 0)
     start_state.h_n = get_h_n(start_state.board_state, goal, heuristic)
     start_state.get_f_n()
 
-    # start the search space with the start_state
     search_space = PriorityQueue()
     search_space.put((start_state.f_n, start_state))
-
-    # stores all the states arleady seen
-    # they are stores as string in order to compare them to current states
     seen_states = set()
 
-    # iterating through search_space until it beoicmes empty
     while not search_space.empty():
-        # extracts the first state on the priority queue (the one with lowest f(n))
+        # Verificar si se excedió el límite de tiempo
+        if time.time() - start_time > time_limit:
+            print(f"Tiempo límite de {time_limit} segundos excedido")
+            return None
+
         current_state = search_space.get()[1]
-        # gets the current board state as a string
         current_state_str = str(current_state.board_state)
-        # checks if the current board_state as string is arleady on the seen_states set
+        
         if current_state_str in seen_states:
             continue
         else: 
-            # if the current state is the goal it builds the path and returns it 
             if check_goal(current_state.board_state, goal):
-                print("Solution found")
+                elapsed_time = time.time() - start_time
+                print(f"Solución encontrada en {elapsed_time:.2f} segundos")
                 return get_path(current_state)
-            # adds current state to seen states 
+                
             seen_states.add(current_state_str)
-    
-            # create the states avaliable from the current one (expands the node)
-            # based on all the possible movements 
             possible_moves, empty_cell_pos = get_possible_moves(current_state.board_state)
 
-            # adds all moves that are possible from the current state
-            # (expanding the nodes by creating new states)
             for possible_move in possible_moves:
-                # gets the new state's board
                 new_board_state = get_new_board_state(possible_move, empty_cell_pos, current_state.board_state)
-                # creates a new node (state created by new move), increases the g(n) by 1 as a new move is made
                 new_state = state(new_board_state, current_state.g_n + 1, current_state)
                 new_state.movement = possible_move
-                # gets the h_n and f_n based on the chosen heuristic
                 new_state.h_n = get_h_n(new_board_state, goal, heuristic)
                 new_state.get_f_n()
-                # if the new state hasnt been seen, add it to the search space 
+                
                 if str(new_board_state) not in seen_states:
                     search_space.put((new_state.f_n, new_state))
 
-    return None 
+    return None
+
 
 def manhattan_heuristic(current_board_state, goal):
     # for this heuristc h_n is the total distance 
@@ -196,50 +188,68 @@ def get_h_n(current_board_state, goal, heuristic):
         h_n = manhattan_heuristic(current_board_state, goal)
     return h_n
 
-def get_direction(from_coord, to_coord):
-    if not to_coord or from_coord:
-        return "Initial State"
-    # Unpack coordinates
-    x1, y1 = from_coord
-    x2, y2 = to_coord
-    
-    # Calculate differences
-    dx = x2 - x1
-    dy = y2 - y1
+def get_direction(from_coord, to_coord, board_state):
+    try:
+        if to_coord is None:
+            return "Estado Inicial"
+            
+        # Mapeo de letras a nombres de colores en español
+        color_names = {
+            'Y': 'AMARILLA',
+            'G': 'VERDE',
+            'B': 'AZUL',
+            'D': 'AZUL OSCURO',
+            'P': 'MORADA',
+            'C': 'CELESTE',
+            '*': 'VACÍO'
+        }
 
-    # Direction mappings (if you need to convert to strings)
-    map = {
-        (0, 1): "RIGHT",
-        (0, -1): "LEFT",
-        (1, 0): "DOWN",
-        (-1, 0): "UP"
-    }
+        # Encontrar la posición del espacio vacío
+        empty_pos = None
+        for i in range(len(board_state)):
+            for j in range(len(board_state[i])):
+                if board_state[i][j] == '*':
+                    empty_pos = (i, j)
+                    break
+            if empty_pos:
+                break
 
-    return map.get((dx,dy))
+        if empty_pos is None:
+            return "Error: No se encontró el espacio vacío"
 
+        # Determinar qué ficha se debe mover basado en la posición del espacio vacío
+        x, y = empty_pos
+        directions = {
+            'arriba': (x-1, y) if x > 0 else None,
+            'abajo': (x+1, y) if x < 4 else None,
+            'izquierda': (x, y-1) if y > 0 else None,
+            'derecha': (x, y+1) if y < 4 else None
+        }
 
+        # Encontrar la dirección correcta
+        for direction, pos in directions.items():
+            if pos == to_coord:
+                color_to_move = board_state[pos[0]][pos[1]]
+                color_name = color_names.get(color_to_move, 'desconocida')
+                return f"Mueve la ficha {color_name} hacia {direction}"
+
+        print(f"Debug - Empty pos: {empty_pos}, To coord: {to_coord}, Board state: {board_state}")
+        return "Sigue las instrucciones para mover las fichas"
+
+    except Exception as e:
+        print(f"Error en get_direction: {e}")
+        return f"Error en las instrucciones: {str(e)}"
 
 @app.post("/api/solve")
 async def solve_puzzle(data: BoardData):
     try:
+        print("Datos recibidos:", data)
         # Convertir matrices de colores a letras
-        COLOR_TO_LETTER = {
-            '#ffd000': 'Y',  # YELLOW
-            '#2db48e': 'G',  # GREEN
-            '#3291d1': 'B',  # BLUE
-            '#3b21e4': 'D',  # BLUED
-            '#8a1aee': 'P',  # PURPLE
-            '#8c8cd4': 'C',  # CLARITO
-            '#000000': '*'   # GRAY (espacio vacío)
-        }
-
-        # Convertir el tablero principal
         main_board_letters = [
             [COLOR_TO_LETTER[color] for color in row]
             for row in data.mainBoard
         ]
 
-        # Convertir el tablero objetivo
         target_board_letters = [
             [COLOR_TO_LETTER[color] for color in row]
             for row in data.targetBoard
@@ -249,33 +259,34 @@ async def solve_puzzle(data: BoardData):
         print("Tablero objetivo en letras:", target_board_letters)
 
         # Usar el algoritmo A* para encontrar la solución
+        start_time = time.time()
         solution = a_star(main_board_letters, target_board_letters, "manhattan")
+        elapsed_time = time.time() - start_time
 
         if solution:
-            # Convertir la solución de vuelta a colores
-            LETTER_TO_COLOR = {v: k for k, v in COLOR_TO_LETTER.items()}
             solution_steps = []
+            previous_pos = None
             
             for board_state, movement in solution:
-                # Convertir cada estado del tablero de letras a colores
                 board_colors = [
                     [LETTER_TO_COLOR[letter] for letter in row]
                     for row in board_state
                 ]
+                
+                direction = get_direction(previous_pos, movement, board_state)
+                previous_pos = movement
+                
                 solution_steps.append({
                     "board": board_colors,
-                    "movement": movement
+                    "movement": movement,
+                    "direction": direction
                 })
 
             return {
                 "success": True,
                 "solution": solution_steps,
-                "steps": len(solution_steps)
-            }
-        else:
-            return {
-                "success": False,
-                "message": "No se encontró solución"
+                "steps": len(solution_steps),
+                "time": f"{elapsed_time:.2f}"
             }
 
     except Exception as e:
