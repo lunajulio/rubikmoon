@@ -20,6 +20,9 @@ const GameBoard = () => {
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isSolving, setIsSolving] = React.useState(false);
   const [currentInstruction, setCurrentInstruction] = React.useState<string>("");
+  const [solutionSteps, setSolutionSteps] = React.useState<any[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = React.useState<number>(0);
+  const [isGuiding, setIsGuiding] = React.useState<boolean>(false);
 
   const findEmptyCell = () => {
     for (let i = 0; i < 5; i++) {
@@ -42,51 +45,104 @@ const GameBoard = () => {
     );
   };
 
+  
+
   const handleMove = (row: number, col: number) => {
+    const emptyCell = findEmptyCell();
+    
+    // Verificar si el movimiento es válido
     if (!isValidMove(row, col)) {
-      // Dar feedback cuando el movimiento no es válido
-      alert("Movimiento no válido. La ficha debe estar junto al espacio vacío.");
+      console.log("Movimiento no válido: la ficha debe estar junto al espacio vacío");
       return;
     }
   
-    const newBoard = mainBoard.map(row => [...row]);
-    const emptyCell = findEmptyCell();
-  
-    [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]] = 
-    [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]];
-  
-    setMainBoard(newBoard);
-  
-    // Verificar si este movimiento completa el paso actual
-    if (solution.length > 0 && currentStep < solution.length) {
-      const expectedBoard = solution[currentStep].board;
-      const isCorrectMove = newBoard.every((row, i) => 
-        row.every((cell, j) => cell === expectedBoard[i][j])
-      );
-  
-      if (isCorrectMove) {
-        if (currentStep === solution.length - 1) {
-          // Último paso completado
-          alert("¡Felicitaciones! Has completado el puzzle!");
-          setSolution([]);
-          setCurrentInstruction("");
-        } else {
-          // Mostrar siguiente instrucción
-          setCurrentStep(currentStep + 1);
-          setCurrentInstruction(solution[currentStep + 1].direction);
-        }
-      } else {
-        // Opcional: dar feedback cuando el movimiento no es el esperado
-        console.log("Movimiento válido pero no es el siguiente paso de la solución");
+    // Si estamos en modo guiado
+    if (isGuiding && currentStepIndex < solutionSteps.length) {
+      const currentStep = solutionSteps[currentStepIndex];
+      
+      // Verificar si es el movimiento esperado
+      if (row !== currentStep.movement[0] || col !== currentStep.movement[1]) {
+        console.log("Este no es el movimiento sugerido");
+        console.log("Esperado:", currentStep.movement);
+        console.log("Recibido:", [row, col]);
+        return;
       }
+  
+      // Realizar el movimiento
+      const newBoard = mainBoard.map(row => [...row]);
+      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
+      [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
+      
+      setMainBoard(newBoard);
+  
+      // Avanzar al siguiente paso
+      if (currentStepIndex < solutionSteps.length - 1) {
+        const nextIndex = currentStepIndex + 1;
+        setCurrentStepIndex(nextIndex);
+        setCurrentInstruction(solutionSteps[nextIndex].direction);
+      } else {
+        setIsGuiding(false);
+        setCurrentInstruction("¡Puzzle completado!");
+      }
+    } else {
+      // Movimiento normal fuera del modo guiado
+      const newBoard = mainBoard.map(row => [...row]);
+      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
+      [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
+      
+      setMainBoard(newBoard);
     }
   };
 
-  const generateNewBoards = () => {
+  // Función para encontrar la celda vacía en un tablero específico
+const findEmptyCellInBoard = (board: string[][]) => {
+  for (let i = 0; i < board.length; i++) {
+    for (let j = 0; j < board[i].length; j++) {
+      if (board[i][j] === COLORS.GRAY) {
+        return { row: i, col: j };
+      }
+    }
+  }
+  return { row: -1, col: -1 };
+};
 
+// Función para verificar si un movimiento es válido en un tablero específico
+const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
+  const emptyCell = findEmptyCellInBoard(board);
+  return (
+    (row === emptyCell.row + 1 && col === emptyCell.col) ||
+    (row === emptyCell.row - 1 && col === emptyCell.col) ||
+    (row === emptyCell.row && col === emptyCell.col + 1) ||
+    (row === emptyCell.row && col === emptyCell.col - 1)
+  );
+};
+
+  const validateSolution = (steps: any[]) => {
+    let currentBoard = mainBoard.map(row => [...row]);
+    
+    for (const step of steps) {
+      const emptyCell = findEmptyCellInBoard(currentBoard);
+      const [targetRow, targetCol] = step.movement;
+      
+      // Verificar si el movimiento es válido
+      if (!isValidMoveForBoard(targetRow, targetCol, currentBoard)) {
+        console.error("Solución inválida: movimiento no permitido");
+        return false;
+      }
+      
+      // Actualizar el tablero
+      const newBoard = currentBoard.map(row => [...row]);
+      [newBoard[emptyCell.row][emptyCell.col], newBoard[targetRow][targetCol]] = 
+      [newBoard[targetRow][targetCol], newBoard[emptyCell.row][emptyCell.col]];
+      currentBoard = newBoard;
+    }
+    
+    return true;
+  };
+
+  const generateNewBoards = () => {
     setSolution([]);
     setCurrentStep(0);
-    setCurrentInstruction("");
     setIsSolving(false);
     // Función auxiliar para contar colores en un tablero
     const countColor = (board: string[][], color: string): number => {
@@ -115,8 +171,6 @@ const GameBoard = () => {
       }
       return newBoard;
     };
-
-    
 
     // Genera el tablero principal (5x5) con exactamente 4 casillas por color
     const generateMainBoard = () => {
@@ -160,12 +214,6 @@ const GameBoard = () => {
   const solvePuzzle = async () => {
     try {
       setIsSolving(true);
-      console.log('Iniciando búsqueda de solución...');
-      console.log('Tableros enviados:', {
-        mainBoard,
-        targetBoard: miniBoard
-      });
-  
       const response = await fetch('http://localhost:8000/api/solve', {
         method: 'POST',
         headers: {
@@ -177,60 +225,32 @@ const GameBoard = () => {
         })
       });
   
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error en la respuesta:', errorText);
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-  
       const data = await response.json();
-      console.log('Respuesta del backend:', data);
-      
+      console.log('Solución recibida:', data);
+  
       if (data.success && data.solution && data.solution.length > 0) {
-        console.log(`Solución encontrada con ${data.steps} pasos`);
-        setSolution(data.solution);
-        setCurrentStep(0);
-        
-        // Verificar que existe una dirección antes de establecerla
-        const initialDirection = data.solution[0]?.direction || "Comienza a mover las fichas";
-        setCurrentInstruction(initialDirection);
-        
-        alert(`¡Solución encontrada!\n` +
-              `Número de pasos: ${data.steps}\n` +
-              `Tiempo: ${data.time} segundos\n` +
-              `Sigue las instrucciones para resolver el puzzle.`);
+        // Validar que cada paso de la solución es válido
+        if (validateSolution(data.solution)) {
+          setSolutionSteps(data.solution);
+          setCurrentStepIndex(0);
+          setIsGuiding(true);
+          setCurrentInstruction(data.solution[0].direction);
+          
+          console.log('Iniciando modo guiado con', data.solution.length, 'pasos');
+          alert(`¡Solución encontrada!\nNúmero de pasos: ${data.solution.length}\nTiempo: ${data.time} segundos`);
+        } else {
+          alert('La solución recibida contiene movimientos inválidos');
+        }
       } else {
-        console.log('No se encontró solución:', data.message);
-        setSolution([]);
-        setCurrentStep(0);
-        setCurrentInstruction("");
-        alert(`No se encontró solución.\n` +
-              `Tiempo de búsqueda: ${data.time} segundos\n` +
-              `${data.message || ''}`);
+        alert('No se encontró solución');
       }
-      
     } catch (error) {
-      console.error('Error detallado:', error);
-      setSolution([]);
-      setCurrentStep(0);
-      setCurrentInstruction("");
-      
-      if (error instanceof Error) {
-        alert(`Error al comunicarse con el backend:\n${error.message}`);
-      } else {
-        alert('Error inesperado al comunicarse con el backend');
-      }
+      console.error('Error:', error);
+      alert('Error al buscar solución');
     } finally {
       setIsSolving(false);
     }
   };
-
-  {/*const showNextStep = () => {
-    if (currentStep < solution.length - 1) {
-      setCurrentStep(currentStep + 1);
-      setMainBoard(solution[currentStep + 1].board);
-    }
-  }; */}
 
   const testBackend = async () => {
     try {
@@ -298,6 +318,12 @@ const GameBoard = () => {
     setIsSolving(false);
   };
   
+  const resetGuide = () => {
+    setIsGuiding(false);
+    setCurrentStepIndex(0);
+    setCurrentInstruction("");
+  };
+
   const runAutomatedTest = async () => {
     try {
       console.log('Iniciando test automatizado...');
@@ -361,7 +387,6 @@ const GameBoard = () => {
     generateNewBoards();
   }, []);
 
-
   return (
     <div className="flex w-full h-[calc(100vh-64px)]"> 
     {/* Columna izquierda - Tableros */}
@@ -374,21 +399,6 @@ const GameBoard = () => {
           ))
         )}
       </div>
-
-      {/* Instrucción actual */}
-      {currentInstruction && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-white text-lg font-bold p-4 bg-blue-600 rounded-lg text-center">
-            {currentInstruction}
-          </div>
-          <div className="text-white text-md">
-            Paso {currentStep + 1} de {solution.length}
-          </div>
-          <div className="text-yellow-400 text-sm">
-            (Haz clic en la ficha que quieres mover hacia el espacio vacío)
-          </div>
-        </div>
-      )}
 
       {/* Tablero principal */}
       <div className="p-4 bg-black rounded-lg">
@@ -408,6 +418,18 @@ const GameBoard = () => {
 
     {/* Columna derecha - Botones */}
     <div className="w-1/2 flex flex-col items-center justify-center gap-4 p-8 bg-black">
+
+      {/* Mostrar instrucciones si estamos en modo guiado */}
+      {isGuiding && (
+            <div className="text-white text-center mb-4 p-4 bg-gray-800 rounded">
+              <p className="text-lg font-bold mb-2">
+                Paso {currentStepIndex + 1} de {solutionSteps.length}
+              </p>
+              <div className="text-xl bg-gray-700 p-3 rounded">
+                {currentInstruction || "Esperando siguiente movimiento..."}
+              </div>
+            </div>
+          )}
       <button 
         onClick={testBackend}
         className="w-64 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"

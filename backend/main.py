@@ -54,14 +54,35 @@ def check_goal(current_board_state, goal):
                 return False
     return True
 
-# gets the path from the last state using the parent property of the state in order to go back
 def get_path(current_state):
     path = []
-    # gets the path until it reaches the first state for which the parent property is None
+    previous_state = None
+    
+    # Reconstruir el camino desde el estado final hasta el inicial
     while current_state:
-        path.append((current_state.board_state, current_state.movement))
+        empty_pos = None
+        # Encontrar la posición vacía en el estado actual
+        for i in range(5):
+            for j in range(5):
+                if current_state.board_state[i][j] == '*':
+                    empty_pos = (i, j)
+                    break
+            if empty_pos:
+                break
+                
+        # Si hay un estado previo, la ficha que se movió está en la posición vacía del estado actual
+        if previous_state:
+            moved_piece_pos = empty_pos
+            path.append({
+                "board_state": current_state.board_state,
+                "from_pos": current_state.movement,
+                "to_pos": empty_pos
+            })
+            
+        previous_state = current_state
         current_state = current_state.parent
-    return path[::-1]
+        
+    return path[::-1]  # Invertir el camino para obtener la secuencia correcta
 
 # gets all the possible moves based on the current state of the board 
 # a move is defined by the change of the position of the empty cell 
@@ -108,7 +129,15 @@ class state:
         self.f_n = 0                    # f(n) = g(n) + h(n)
         self.parent = parent            # for path reconstruction
         self.movement = None
+        self.empty_pos = self.find_empty()
 
+    def find_empty(self):
+        for i in range(5):
+            for j in range(5):
+                if self.board_state[i][j] == '*':
+                    return (i, j)
+        return None
+    
     def get_f_n(self):
         self.f_n = self.g_n + self.h_n
 
@@ -190,9 +219,29 @@ def get_h_n(current_board_state, goal, heuristic):
 
 def get_direction(from_coord, to_coord, board_state):
     try:
-        if to_coord is None:
+        if from_coord is None or to_coord is None:
             return "Estado Inicial"
             
+        # Encontrar la posición del espacio vacío
+        empty_pos = None
+        for i in range(5):
+            for j in range(5):
+                if board_state[i][j] == '*':
+                    empty_pos = (i, j)
+                    break
+            if empty_pos:
+                break
+                
+        if not empty_pos:
+            return "Error: No se encontró el espacio vacío"
+
+        # Verificar que el movimiento es válido
+        if abs(to_coord[0] - empty_pos[0]) + abs(to_coord[1] - empty_pos[1]) != 1:
+            return "Error: Movimiento no adyacente al espacio vacío"
+
+        # La ficha que se moverá está en la posición to_coord
+        color_to_move = board_state[to_coord[0]][to_coord[1]]
+        
         # Mapeo de letras a nombres de colores en español
         color_names = {
             'Y': 'AMARILLA',
@@ -203,38 +252,9 @@ def get_direction(from_coord, to_coord, board_state):
             'C': 'CELESTE',
             '*': 'VACÍO'
         }
-
-        # Encontrar la posición del espacio vacío
-        empty_pos = None
-        for i in range(len(board_state)):
-            for j in range(len(board_state[i])):
-                if board_state[i][j] == '*':
-                    empty_pos = (i, j)
-                    break
-            if empty_pos:
-                break
-
-        if empty_pos is None:
-            return "Error: No se encontró el espacio vacío"
-
-        # Determinar qué ficha se debe mover basado en la posición del espacio vacío
-        x, y = empty_pos
-        directions = {
-            'arriba': (x-1, y) if x > 0 else None,
-            'abajo': (x+1, y) if x < 4 else None,
-            'izquierda': (x, y-1) if y > 0 else None,
-            'derecha': (x, y+1) if y < 4 else None
-        }
-
-        # Encontrar la dirección correcta
-        for direction, pos in directions.items():
-            if pos == to_coord:
-                color_to_move = board_state[pos[0]][pos[1]]
-                color_name = color_names.get(color_to_move, 'desconocida')
-                return f"Mueve la ficha {color_name} hacia {direction}"
-
-        print(f"Debug - Empty pos: {empty_pos}, To coord: {to_coord}, Board state: {board_state}")
-        return "Sigue las instrucciones para mover las fichas"
+        
+        color_name = color_names.get(color_to_move, 'desconocida')
+        return f"Mueve la ficha {color_name} en ({to_coord[0]}, {to_coord[1]})"
 
     except Exception as e:
         print(f"Error en get_direction: {e}")
@@ -244,7 +264,6 @@ def get_direction(from_coord, to_coord, board_state):
 async def solve_puzzle(data: BoardData):
     try:
         print("Datos recibidos:", data)
-        # Convertir matrices de colores a letras
         main_board_letters = [
             [COLOR_TO_LETTER[color] for color in row]
             for row in data.mainBoard
@@ -255,38 +274,42 @@ async def solve_puzzle(data: BoardData):
             for row in data.targetBoard
         ]
 
-        print("Tablero principal en letras:", main_board_letters)
-        print("Tablero objetivo en letras:", target_board_letters)
-
-        # Usar el algoritmo A* para encontrar la solución
         start_time = time.time()
         solution = a_star(main_board_letters, target_board_letters, "manhattan")
         elapsed_time = time.time() - start_time
 
         if solution:
             solution_steps = []
-            previous_pos = None
             
-            for board_state, movement in solution:
-                board_colors = [
-                    [LETTER_TO_COLOR[letter] for letter in row]
-                    for row in board_state
-                ]
+            for step in solution[1:]:  # Ignorar el estado inicial
+                board_state = step["board_state"]
+                from_pos = step["from_pos"]
+                to_pos = step["to_pos"]
                 
-                direction = get_direction(previous_pos, movement, board_state)
-                previous_pos = movement
+                # Obtener el color de la ficha que se mueve
+                color_letter = board_state[from_pos[0]][from_pos[1]]
+                color_hex = LETTER_TO_COLOR[color_letter]
                 
-                solution_steps.append({
-                    "board": board_colors,
-                    "movement": movement,
-                    "direction": direction
-                })
+                step_info = {
+                    "board": [
+                        [LETTER_TO_COLOR[letter] for letter in row]
+                        for row in board_state
+                    ],
+                    "movement": from_pos,
+                    "direction": f"Mueve la ficha en ({from_pos[0]}, {from_pos[1]})"
+                }
+                solution_steps.append(step_info)
 
             return {
                 "success": True,
                 "solution": solution_steps,
                 "steps": len(solution_steps),
                 "time": f"{elapsed_time:.2f}"
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No se encontró solución"
             }
 
     except Exception as e:
