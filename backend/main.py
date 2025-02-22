@@ -32,6 +32,17 @@ COLOR_TO_LETTER = {
     '#8c8cd4': 'C',  # CLARITO
     '#000000': '*'   # GRAY (espacio vacío)
 }
+color_names = {
+            'Y': 'AMARILLA',
+            'G': 'VERDE',
+            'B': 'AZUL',
+            'D': 'AZUL OSCURO',
+            'P': 'MORADA',
+            'C': 'CELESTE',
+            '*': 'VACÍO'
+}
+
+
 
 LETTER_TO_COLOR = {v: k for k, v in COLOR_TO_LETTER.items()}
 
@@ -76,7 +87,8 @@ def get_path(current_state):
             path.append({
                 "board_state": current_state.board_state,
                 "from_pos": current_state.movement,
-                "to_pos": empty_pos
+                "to_pos": empty_pos,
+                "piece_color": current_state.board_state[moved_piece_pos[0]][moved_piece_pos[1]]
             })
             
         previous_state = current_state
@@ -222,27 +234,9 @@ def get_direction(from_coord, to_coord, board_state):
         if from_coord is None or to_coord is None:
             return "Estado Inicial"
             
-        # Encontrar la posición del espacio vacío
-        empty_pos = None
-        for i in range(5):
-            for j in range(5):
-                if board_state[i][j] == '*':
-                    empty_pos = (i, j)
-                    break
-            if empty_pos:
-                break
-                
-        if not empty_pos:
-            return "Error: No se encontró el espacio vacío"
-
-        # Verificar que el movimiento es válido
-        if abs(to_coord[0] - empty_pos[0]) + abs(to_coord[1] - empty_pos[1]) != 1:
-            return "Error: Movimiento no adyacente al espacio vacío"
-
-        # La ficha que se moverá está en la posición to_coord
+        # La ficha que se moverá está en to_coord
         color_to_move = board_state[to_coord[0]][to_coord[1]]
         
-        # Mapeo de letras a nombres de colores en español
         color_names = {
             'Y': 'AMARILLA',
             'G': 'VERDE',
@@ -252,14 +246,28 @@ def get_direction(from_coord, to_coord, board_state):
             'C': 'CELESTE',
             '*': 'VACÍO'
         }
-        
+
         color_name = color_names.get(color_to_move, 'desconocida')
-        return f"Mueve la ficha {color_name} en ({to_coord[0]}, {to_coord[1]})"
+        # Añadir print para debug
+        print(f"Color a mover: {color_to_move} -> {color_name}")
+        return f"Toca la ficha de color {color_name}"
 
     except Exception as e:
         print(f"Error en get_direction: {e}")
         return f"Error en las instrucciones: {str(e)}"
 
+
+def get_direction_text(from_pos, to_pos):
+    """Convierte las coordenadas en una dirección amigable para el usuario"""
+    if from_pos[0] < to_pos[0]:
+        return "Mueve la ficha hacia abajo"
+    elif from_pos[0] > to_pos[0]:
+        return "Mueve la ficha hacia arriba"
+    elif from_pos[1] < to_pos[1]:
+        return "Mueve la ficha hacia la derecha"
+    else:
+        return "Mueve la ficha hacia la izquierda"
+    
 @app.post("/api/solve")
 async def solve_puzzle(data: BoardData):
     try:
@@ -268,6 +276,10 @@ async def solve_puzzle(data: BoardData):
             [COLOR_TO_LETTER[color] for color in row]
             for row in data.mainBoard
         ]
+
+        print("Tablero convertido a letras:")
+        for row in main_board_letters:
+            print(row)
 
         target_board_letters = [
             [COLOR_TO_LETTER[color] for color in row]
@@ -286,17 +298,15 @@ async def solve_puzzle(data: BoardData):
                 from_pos = step["from_pos"]
                 to_pos = step["to_pos"]
                 
-                # Obtener el color de la ficha que se mueve
-                color_letter = board_state[from_pos[0]][from_pos[1]]
-                color_hex = LETTER_TO_COLOR[color_letter]
-                
+                direction = get_direction_text(from_pos, to_pos)
+
                 step_info = {
                     "board": [
                         [LETTER_TO_COLOR[letter] for letter in row]
                         for row in board_state
                     ],
                     "movement": from_pos,
-                    "direction": f"Mueve la ficha en ({from_pos[0]}, {from_pos[1]})"
+                    "direction": direction
                 }
                 solution_steps.append(step_info)
 

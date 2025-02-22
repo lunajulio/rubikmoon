@@ -59,12 +59,10 @@ const GameBoard = () => {
     // Si estamos en modo guiado
     if (isGuiding && currentStepIndex < solutionSteps.length) {
       const currentStep = solutionSteps[currentStepIndex];
+      const [expectedRow, expectedCol] = currentStep.movement;
       
       // Verificar si es el movimiento esperado
       if (row !== currentStep.movement[0] || col !== currentStep.movement[1]) {
-        console.log("Este no es el movimiento sugerido");
-        console.log("Esperado:", currentStep.movement);
-        console.log("Recibido:", [row, col]);
         return;
       }
   
@@ -235,8 +233,7 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
           setCurrentStepIndex(0);
           setIsGuiding(true);
           setCurrentInstruction(data.solution[0].direction);
-          
-          console.log('Iniciando modo guiado con', data.solution.length, 'pasos');
+      
           alert(`¡Solución encontrada!\nNúmero de pasos: ${data.solution.length}\nTiempo: ${data.time} segundos`);
         } else {
           alert('La solución recibida contiene movimientos inválidos');
