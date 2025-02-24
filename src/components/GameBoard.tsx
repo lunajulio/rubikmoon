@@ -2,6 +2,8 @@
 
 import React from 'react';
 import Cell from './Cell';
+import path from 'path';
+import fs from 'fs';
 
 const COLORS = {
   YELLOW: '#ffd000',
@@ -138,76 +140,40 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     return true;
   };
 
-  const generateNewBoards = () => {
+  const parseBoard = (boardString: string, size: number) => {
+    const rows = boardString.split(',');
+    return rows.map(row => row.split('').map(char => {
+      switch (char) {
+        case 'Y': return COLORS.YELLOW;
+        case 'G': return COLORS.GREEN;
+        case 'B': return COLORS.BLUE;
+        case 'D': return COLORS.BLUED;
+        case 'P': return COLORS.PURPLE;
+        case 'C': return COLORS.CLARITO;
+        case '*': return COLORS.GRAY;
+        default: return COLORS.GRAY;
+      }
+    }));
+  };
+
+  const loadBoardsFromFile = async () => {
     setSolution([]);
     setCurrentStep(0);
     setIsSolving(false);
-    // Función auxiliar para contar colores en un tablero
-    const countColor = (board: string[][], color: string): number => {
-      return board.flat().filter(c => c === color).length;
-    };
+    const response = await fetch('/test-cases.txt');
+    const fileContent = await response.text();
+    const cases = fileContent.split('\n').filter(line => line.trim() !== '');
+    const randomCase = cases[Math.floor(Math.random() * cases.length)];
+    const [mainBoardString, miniBoardString] = randomCase.split('|');
 
-    // Genera el mini tablero (3x3) con máximo 4 casillas por color
-    const generateMiniBoard = () => {
-      const newBoard = Array(3).fill(null).map(() => Array(3).fill(null));
-      const colors = Object.values(COLORS).filter(c => c !== COLORS.GRAY);
-      
-      for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-          let availableColors = colors.filter(color => 
-            countColor(newBoard, color) < 4
-          );
-          
-          if (availableColors.length === 0) {
-            availableColors = colors;
-          }
-          
-          newBoard[i][j] = availableColors[
-            Math.floor(Math.random() * availableColors.length)
-          ];
-        }
-      }
-      return newBoard;
-    };
+    const newMainBoard = parseBoard(mainBoardString, 5);
+    const newMiniBoard = parseBoard(miniBoardString, 3);
 
-    // Genera el tablero principal (5x5) con exactamente 4 casillas por color
-    const generateMainBoard = () => {
-      const colors = Object.values(COLORS).filter(c => c !== COLORS.GRAY);
-      let colorPool: string[] = [];
-      
-      // Agregar exactamente 4 casillas de cada color
-      colors.forEach(color => {
-        colorPool = colorPool.concat(Array(4).fill(color));
-      });
-      
-      // Agregar una casilla gris
-      colorPool.push(COLORS.GRAY);
-      
-      // Mezclar el array
-      for (let i = colorPool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [colorPool[i], colorPool[j]] = [colorPool[j], colorPool[i]];
-      }
-      
-      // Crear el tablero 5x5
-      const newBoard: string[][] = [];
-      for (let i = 0; i < 5; i++) {
-        const row: string[] = [];
-        for (let j = 0; j < 5; j++) {
-          row.push(colorPool[i * 5 + j]);
-        }
-        newBoard.push(row);
-      }
-      
-      return newBoard;
-    };
-
-    const newMiniBoard = generateMiniBoard();
-    const newMainBoard = generateMainBoard();
-
-    setMiniBoard(newMiniBoard);
     setMainBoard(newMainBoard);
+    setMiniBoard(newMiniBoard);
   };
+
+  
 
   const solvePuzzle = async () => {
     try {
@@ -249,71 +215,6 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     }
   };
 
-  const testBackend = async () => {
-    try {
-      console.log('Probando conexión con backend...');
-      const response = await fetch('http://localhost:8000/test');
-      const data = await response.json();
-      console.log('Respuesta de prueba:', data);
-      alert('Conexión exitosa con el backend!');
-    } catch (error) {
-      console.error('Error en prueba:', error);
-      alert('Error al conectar con el backend');
-    }
-  };
-
-  const testSpecificCase = () => {
-    // Definir el tablero de prueba específico
-    const testMainBoard = [
-      ['V', 'Z', 'N', 'V', 'Z'],
-      ['R', 'B', 'Z', 'R', 'R'],
-      ['B', 'R', '*', 'B', 'N'],
-      ['A', 'A', 'V', 'V', 'Z'],
-      ['N', 'A', 'A', 'B', 'N']
-    ];
-  
-    const testMiniBoard = [
-      ['N', 'B', 'R'],
-      ['A', 'A', 'V'],
-      ['A', 'Z', 'Z']
-    ];
-  
-    // Mapeo de letras a colores usando tus COLORS existentes
-    const letterToColor = {
-      'N': COLORS.BLUED,    // '#3b21e4'
-      'B': COLORS.BLUE,     // '#3291d1'
-      'R': COLORS.YELLOW,   // '#ffd000'
-      'V': COLORS.GREEN,    // '#2db48e'
-      'Z': COLORS.CLARITO,  // '#8c8cd4'
-      'A': COLORS.PURPLE,   // '#8a1aee'
-      '*': COLORS.GRAY      // '#000000'
-    } as const;
-  
-    console.log('Tablero de prueba principal:', testMainBoard);
-    console.log('Tablero de prueba objetivo:', testMiniBoard);
-  
-    // Convertir los tableros de letras a colores
-    const colorMainBoard = testMainBoard.map(row =>
-      row.map((letter) => letterToColor[letter as keyof typeof letterToColor])
-    );
-  
-    const colorMiniBoard = testMiniBoard.map(row =>
-      row.map((letter) => letterToColor[letter as keyof typeof letterToColor])
-    );
-  
-    console.log('Tablero principal convertido:', colorMainBoard);
-    console.log('Tablero objetivo convertido:', colorMiniBoard);
-  
-    // Establecer los tableros
-    setMainBoard(colorMainBoard);
-    setMiniBoard(colorMiniBoard);
-  
-    // Resetear estados
-    setSolution([]);
-    setCurrentStep(0);
-    setCurrentInstruction("");
-    setIsSolving(false);
-  };
   
   const resetGuide = () => {
     setIsGuiding(false);
@@ -321,67 +222,9 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     setCurrentInstruction("");
   };
 
-  const runAutomatedTest = async () => {
-    try {
-      console.log('Iniciando test automatizado...');
-      // Cargar el caso de prueba
-      testSpecificCase();
-      
-      // Esperar un momento para asegurar que los estados se actualizaron
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log('Enviando tableros al backend:', {
-        mainBoard,
-        targetBoard: miniBoard
-      });
-  
-      // Intentar resolver
-      const response = await fetch('http://localhost:8000/api/solve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mainBoard,
-          targetBoard: miniBoard
-        })
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error en la respuesta: ${errorText}`);
-      }
-  
-      const data = await response.json();
-      console.log('Respuesta del backend:', data);
-      
-      if (data.success) {
-        console.log('Test exitoso:');
-        console.log(`- Solución encontrada en ${data.steps} pasos`);
-        console.log(`- Tiempo: ${data.time} segundos`);
-        setSolution(data.solution);
-        setCurrentStep(0);
-        if (data.solution[0]?.direction) {
-          setCurrentInstruction(data.solution[0].direction);
-        }
-        alert(`Test exitoso:\nSolución encontrada en ${data.steps} pasos\nTiempo: ${data.time} segundos`);
-      } else {
-        console.error('Test fallido:', data.message);
-        alert(`Test fallido: ${data.message}`);
-      }
-      
-    } catch (error) {
-      console.error('Error en el test:', error);
-      if (error instanceof Error) {
-        alert(`Error al ejecutar el test: ${error.message}`);
-      } else {
-        alert('Error al ejecutar el test');
-      }
-    }
-  };
 
   React.useEffect(() => {
-    generateNewBoards();
+    loadBoardsFromFile();
   }, []);
 
   return (
@@ -416,26 +259,8 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     {/* Columna derecha - Botones */}
     <div className="w-1/2 flex flex-col items-center justify-center gap-4 p-8 bg-black">
 
-      {/* Mostrar instrucciones si estamos en modo guiado */}
-      {isGuiding && (
-            <div className="text-white text-center mb-4 p-4 bg-gray-800 rounded">
-              <p className="text-lg font-bold mb-2">
-                Paso {currentStepIndex + 1} de {solutionSteps.length}
-              </p>
-              <div className="text-xl bg-gray-700 p-3 rounded">
-                {currentInstruction || "Esperando siguiente movimiento..."}
-              </div>
-            </div>
-          )}
       <button 
-        onClick={testBackend}
-        className="w-64 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors"
-      >
-        Probar Conexión
-      </button>
-
-      <button 
-        onClick={generateNewBoards}
+        onClick={loadBoardsFromFile}
         className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
       >
         Generar Nuevos Tableros
@@ -448,14 +273,6 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
       >
         {isSolving ? 'Resolviendo...' : 'Resolver Puzzle'}
       </button>
-
-      {/* Nuevo botón de test automatizado */}
-      <button 
-        onClick={runAutomatedTest}
-        className="w-64 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-      >
-        Ejecutar Test Automatizado
-      </button> 
 
     </div>
   </div>

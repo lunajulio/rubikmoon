@@ -5,6 +5,7 @@ from typing import List, Optional
 from queue import PriorityQueue
 import copy
 import time
+from state import state
 
 app = FastAPI()
 
@@ -17,10 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Endpoint de prueba
-@app.get("/test")
-async def test_endpoint():
-    return {"message": "Backend está funcionando!"}
 
 # Mapeo de colores a letras
 COLOR_TO_LETTER = {
@@ -88,7 +85,6 @@ def get_path(current_state):
                 "board_state": current_state.board_state,
                 "from_pos": current_state.movement,
                 "to_pos": empty_pos,
-                "piece_color": current_state.board_state[moved_piece_pos[0]][moved_piece_pos[1]]
             })
             
         previous_state = current_state
@@ -133,34 +129,6 @@ def get_new_board_state(possible_move, empty_cell_pos, current_state_board):
 
     return new_board_state
 
-class state:
-    def __init__(self, board_state, g_n, parent=None):
-        self.board_state = board_state  # board state of that given state
-        self.g_n = g_n                  # cost from start to current node g(n)
-        self.h_n = 0                    # heuristic estimate from n to goal h(n)
-        self.f_n = 0                    # f(n) = g(n) + h(n)
-        self.parent = parent            # for path reconstruction
-        self.movement = None
-        self.empty_pos = self.find_empty()
-
-    def find_empty(self):
-        for i in range(5):
-            for j in range(5):
-                if self.board_state[i][j] == '*':
-                    return (i, j)
-        return None
-    
-    def get_f_n(self):
-        self.f_n = self.g_n + self.h_n
-
-    # function that ensures that the priority queue gets the most promissing state 
-    # the one with lower f(n), it has to be named like that to properly work with the pq library
-    def __lt__(self, other_state):
-        # compare f(n)
-        if (self.f_n != other_state.f_n):
-            return self.f_n < other_state.f_n
-        # If f_scores are equal, compare h_scores
-        return self.h_n < other_state.h_n
 
 def a_star(start, goal, heuristic, time_limit=100):  # Agregamos el parámetro time_limit
     start_time = time.time()  # Registramos el tiempo de inicio
@@ -229,44 +197,6 @@ def get_h_n(current_board_state, goal, heuristic):
         h_n = manhattan_heuristic(current_board_state, goal)
     return h_n
 
-def get_direction(from_coord, to_coord, board_state):
-    try:
-        if from_coord is None or to_coord is None:
-            return "Estado Inicial"
-            
-        # La ficha que se moverá está en to_coord
-        color_to_move = board_state[to_coord[0]][to_coord[1]]
-        
-        color_names = {
-            'Y': 'AMARILLA',
-            'G': 'VERDE',
-            'B': 'AZUL',
-            'D': 'AZUL OSCURO',
-            'P': 'MORADA',
-            'C': 'CELESTE',
-            '*': 'VACÍO'
-        }
-
-        color_name = color_names.get(color_to_move, 'desconocida')
-        # Añadir print para debug
-        print(f"Color a mover: {color_to_move} -> {color_name}")
-        return f"Toca la ficha de color {color_name}"
-
-    except Exception as e:
-        print(f"Error en get_direction: {e}")
-        return f"Error en las instrucciones: {str(e)}"
-
-
-def get_direction_text(from_pos, to_pos):
-    """Convierte las coordenadas en una dirección amigable para el usuario"""
-    if from_pos[0] < to_pos[0]:
-        return "Mueve la ficha hacia abajo"
-    elif from_pos[0] > to_pos[0]:
-        return "Mueve la ficha hacia arriba"
-    elif from_pos[1] < to_pos[1]:
-        return "Mueve la ficha hacia la derecha"
-    else:
-        return "Mueve la ficha hacia la izquierda"
     
 @app.post("/api/solve")
 async def solve_puzzle(data: BoardData):
@@ -297,8 +227,6 @@ async def solve_puzzle(data: BoardData):
                 board_state = step["board_state"]
                 from_pos = step["from_pos"]
                 to_pos = step["to_pos"]
-                
-                direction = get_direction_text(from_pos, to_pos)
 
                 step_info = {
                     "board": [
@@ -306,7 +234,6 @@ async def solve_puzzle(data: BoardData):
                         for row in board_state
                     ],
                     "movement": from_pos,
-                    "direction": direction
                 }
                 solution_steps.append(step_info)
 
