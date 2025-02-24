@@ -237,6 +237,11 @@ async def solve_puzzle(data: BoardData):
                 }
                 solution_steps.append(step_info)
 
+            #imprimir los movement de solutionsteps
+            print("Movimientos de la solución:")
+            for step in solution_steps:
+                print(step["movement"])
+                
             return {
                 "success": True,
                 "solution": solution_steps,

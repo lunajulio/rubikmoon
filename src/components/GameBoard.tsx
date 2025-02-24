@@ -2,8 +2,7 @@
 
 import React from 'react';
 import Cell from './Cell';
-import path from 'path';
-import fs from 'fs';
+import Modal from './Modal';
 
 const COLORS = {
   YELLOW: '#ffd000',
@@ -25,6 +24,8 @@ const GameBoard = () => {
   const [solutionSteps, setSolutionSteps] = React.useState<any[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = React.useState<number>(0);
   const [isGuiding, setIsGuiding] = React.useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = React.useState<boolean>(false);
+  const [boardHistory, setBoardHistory] = React.useState<string[][][]>([]);
 
   const findEmptyCell = () => {
     for (let i = 0; i < 5; i++) {
@@ -47,8 +48,6 @@ const GameBoard = () => {
     );
   };
 
-  
-
   const handleMove = (row: number, col: number) => {
     const emptyCell = findEmptyCell();
     
@@ -64,11 +63,14 @@ const GameBoard = () => {
       const [expectedRow, expectedCol] = currentStep.movement;
       
       // Verificar si es el movimiento esperado
-      if (row !== currentStep.movement[0] || col !== currentStep.movement[1]) {
+      if (row !== expectedRow || col !== expectedCol) {
+        console.log("Movimiento no esperado en modo guiado");
         return;
       }
   
       // Realizar el movimiento
+          // Guardar el estado actual del tablero en el historial
+      setBoardHistory(prevHistory => [...prevHistory, mainBoard.map(row => [...row])]);
       const newBoard = mainBoard.map(row => [...row]);
       [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
       [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
@@ -83,6 +85,7 @@ const GameBoard = () => {
       } else {
         setIsGuiding(false);
         setCurrentInstruction("¡Puzzle completado!");
+        setIsModalOpen(true);
       }
     } else {
       // Movimiento normal fuera del modo guiado
@@ -92,30 +95,29 @@ const GameBoard = () => {
       
       setMainBoard(newBoard);
     }
+
   };
 
-  // Función para encontrar la celda vacía en un tablero específico
-const findEmptyCellInBoard = (board: string[][]) => {
-  for (let i = 0; i < board.length; i++) {
-    for (let j = 0; j < board[i].length; j++) {
-      if (board[i][j] === COLORS.GRAY) {
-        return { row: i, col: j };
+  const findEmptyCellInBoard = (board: string[][]) => {
+    for (let i = 0; i < board.length; i++) {
+      for (let j = 0; j < board[i].length; j++) {
+        if (board[i][j] === COLORS.GRAY) {
+          return { row: i, col: j };
+        }
       }
     }
-  }
-  return { row: -1, col: -1 };
-};
+    return { row: -1, col: -1 };
+  };
 
-// Función para verificar si un movimiento es válido en un tablero específico
-const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
-  const emptyCell = findEmptyCellInBoard(board);
-  return (
-    (row === emptyCell.row + 1 && col === emptyCell.col) ||
-    (row === emptyCell.row - 1 && col === emptyCell.col) ||
-    (row === emptyCell.row && col === emptyCell.col + 1) ||
-    (row === emptyCell.row && col === emptyCell.col - 1)
-  );
-};
+  const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
+    const emptyCell = findEmptyCellInBoard(board);
+    return (
+      (row === emptyCell.row + 1 && col === emptyCell.col) ||
+      (row === emptyCell.row - 1 && col === emptyCell.col) ||
+      (row === emptyCell.row && col === emptyCell.col + 1) ||
+      (row === emptyCell.row && col === emptyCell.col - 1)
+    );
+  };
 
   const validateSolution = (steps: any[]) => {
     let currentBoard = mainBoard.map(row => [...row]);
@@ -160,6 +162,7 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     setSolution([]);
     setCurrentStep(0);
     setIsSolving(false);
+    setBoardHistory([]);
     const response = await fetch('/test-cases.txt');
     const fileContent = await response.text();
     const cases = fileContent.split('\n').filter(line => line.trim() !== '');
@@ -172,8 +175,6 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     setMainBoard(newMainBoard);
     setMiniBoard(newMiniBoard);
   };
-
-  
 
   const solvePuzzle = async () => {
     try {
@@ -215,68 +216,95 @@ const isValidMoveForBoard = (row: number, col: number, board: string[][]) => {
     }
   };
 
-  
   const resetGuide = () => {
     setIsGuiding(false);
     setCurrentStepIndex(0);
     setCurrentInstruction("");
   };
 
+  const handlePlayAgain = () => {
+    setIsModalOpen(false);
+    resetGuide();
+    setBoardHistory([]);
+    loadBoardsFromFile();
+
+  };
 
   React.useEffect(() => {
     loadBoardsFromFile();
   }, []);
 
   return (
-    <div className="flex w-full h-[calc(100vh-64px)]"> 
-    {/* Columna izquierda - Tableros */}
-    <div className="w-1/2 flex flex-col items-center justify-center gap-8 p-8 bg-black">
-      {/* Mini tablero (objetivo) */}
-      <div className="grid grid-cols-3 gap-1">
-        {miniBoard.map((row, i) =>
-          row.map((color, j) => (
-            <Cell key={`mini-${i}-${j}`} color={color} size="small" />
-          ))
-        )}
-      </div>
-
-      {/* Tablero principal */}
-      <div className="p-4 bg-black rounded-lg">
-        <div className="grid grid-cols-5 gap-1">
-          {mainBoard.map((row, i) =>
+    <div className="flex w-full h-[calc(100vh-64px)]">
+      {/* Columna izquierda - Tableros */}
+      <div className="w-1/3 flex flex-col items-center justify-center gap-8 p-8 bg-black">
+        {/* Mini tablero (objetivo) */}
+        <div className="grid grid-cols-3 gap-1">
+          {miniBoard.map((row, i) =>
             row.map((color, j) => (
-              <Cell 
-                key={`main-${i}-${j}`} 
-                color={color}
-                onClick={() => handleMove(i, j)}
-              />
+              <Cell key={`mini-${i}-${j}`} color={color} size="small" />
             ))
           )}
         </div>
+
+        {/* Tablero principal */}
+        <div className="p-4 bg-black rounded-lg">
+          <div className="grid grid-cols-5 gap-1">
+            {mainBoard.map((row, i) =>
+              row.map((color, j) => (
+                <Cell 
+                  key={`main-${i}-${j}`} 
+                  color={color}
+                  onClick={() => handleMove(i, j)}
+                />
+              ))
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Columna central - Botones */}
+      <div className="w-1/3 flex flex-col items-center justify-center gap-4 p-8 bg-black">
+        <button 
+          onClick={loadBoardsFromFile}
+          className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          Generar Nuevos Tableros
+        </button>
+
+        <button 
+          onClick={solvePuzzle}
+          disabled={isSolving}
+          className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          {isSolving ? 'Resolviendo...' : 'Resolver Puzzle'}
+        </button>
+      </div>
+
+      {/* Columna derecha - Historial */}
+      <div className="w-1/3 flex flex-col items-center justify-center gap-4 p-8 bg-black overflow-y-auto h-full">
+        <h2 className="text-white text-xl mb-4">Historial de Tableros</h2>
+        {boardHistory.map((board, index) => (
+          <div key={index} className="mb-4">
+            <div className="grid grid-cols-5 gap-1">
+              {board.map((row, i) =>
+                row.map((color, j) => (
+                  <Cell key={`history-${index}-${i}-${j}`} color={color} size="small" />
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onPlayAgain={handlePlayAgain} 
+      />
     </div>
-
-    {/* Columna derecha - Botones */}
-    <div className="w-1/2 flex flex-col items-center justify-center gap-4 p-8 bg-black">
-
-      <button 
-        onClick={loadBoardsFromFile}
-        className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-      >
-        Generar Nuevos Tableros
-      </button>
-
-      <button 
-        onClick={solvePuzzle}
-        disabled={isSolving}
-        className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-      >
-        {isSolving ? 'Resolviendo...' : 'Resolver Puzzle'}
-      </button>
-
-    </div>
-  </div>
-);
+  );
 };
 
 export default GameBoard;
