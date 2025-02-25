@@ -18,7 +18,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # Mapeo de colores a letras
 COLOR_TO_LETTER = {
     '#ffd000': 'Y',  # YELLOW
@@ -29,31 +28,13 @@ COLOR_TO_LETTER = {
     '#8c8cd4': 'C',  # CLARITO
     '#000000': '*'   # GRAY (espacio vacío)
 }
-color_names = {
-            'Y': 'AMARILLA',
-            'G': 'VERDE',
-            'B': 'AZUL',
-            'D': 'AZUL OSCURO',
-            'P': 'MORADA',
-            'C': 'CELESTE',
-            '*': 'VACÍO'
-}
-
-
 
 LETTER_TO_COLOR = {v: k for k, v in COLOR_TO_LETTER.items()}
-
 
 class BoardData(BaseModel):
     mainBoard: List[List[str]]
     targetBoard: List[List[str]]
 
-
-# placeholder heuristic function
-def get_h_n(state, goal, heuristic):
-    pass
-
-# checks if a board state is the goal pattern (condition to win)
 def check_goal(current_board_state, goal):
     # check if the center 3x3 matches the goal pattern
     for i in range(3):
@@ -66,10 +47,8 @@ def get_path(current_state):
     path = []
     previous_state = None
     
-    # Reconstruir el camino desde el estado final hasta el inicial
     while current_state:
         empty_pos = None
-        # Encontrar la posición vacía en el estado actual
         for i in range(5):
             for j in range(5):
                 if current_state.board_state[i][j] == '*':
@@ -78,9 +57,7 @@ def get_path(current_state):
             if empty_pos:
                 break
                 
-        # Si hay un estado previo, la ficha que se movió está en la posición vacía del estado actual
         if previous_state:
-            moved_piece_pos = empty_pos
             path.append({
                 "board_state": current_state.board_state,
                 "from_pos": current_state.movement,
@@ -90,59 +67,61 @@ def get_path(current_state):
         previous_state = current_state
         current_state = current_state.parent
         
-    return path[::-1]  # Invertir el camino para obtener la secuencia correcta
+    return path[::-1]
 
-# gets all the possible moves based on the current state of the board 
-# a move is defined by the change of the position of the empty cell 
 def get_possible_moves(current_board_state):
     empty_cell_pos = None
-    # stores all possible moves
     possible_moves = set()
-    # gets the position where the empty cell is 
-    for i in range (5):
+    for i in range(5):
         for j in range(5):
-            if (current_board_state[i][j] == '*'):
-                empty_cell_pos = (i,j)
-                break 
-    # Possible directions: up, right, down, left
+            if current_board_state[i][j] == '*':
+                empty_cell_pos = (i, j)
+                break
     possible_directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-    #gets all the possible positions of the movements
-    for dx, dy in possible_directions: 
+    for dx, dy in possible_directions:
         moved_x, moved_y = empty_cell_pos[0] + dx, empty_cell_pos[1] + dy
-        # checks if the new positionts are within bounds
-        if (0 <= moved_x < 5 and 0 <= moved_y < 5):
-            possible_moves.add((moved_x, moved_y))  # Using add() instead of append()
+        if 0 <= moved_x < 5 and 0 <= moved_y < 5:
+            possible_moves.add((moved_x, moved_y))
     return possible_moves, empty_cell_pos
 
 def get_new_board_state(possible_move, empty_cell_pos, current_state_board):
     new_board_state = copy.deepcopy(current_state_board)
-
-    # coordinates of the position of the empty cell
     empty_row, empty_col = empty_cell_pos
-    # coordinates of the empty_cell after performing the movement
     new_row, new_col = possible_move
-    # gets the tile state of the tile taht was in the position where the empty one will be 
-    tile = new_board_state[new_row][new_col] 
-    # swaps the empty value to the new position and the tile to the position where the empty one was 
+    tile = new_board_state[new_row][new_col]
     new_board_state[new_row][new_col] = "*"
     new_board_state[empty_row][empty_col] = tile
-
     return new_board_state
 
+def manhattan_heuristic(current_board_state, goal):
+    h_n = 0
+    for target_y in range(3):
+        for target_x in range(3):
+            target_tile = goal[target_y][target_x]
+            min_distance = float('inf')
+            for current_y in range(5):
+                for current_x in range(5):
+                    if current_board_state[current_y][current_x] == target_tile:
+                        distance = abs(current_x - (target_x+1)) + abs(current_y - (target_y+1))
+                        min_distance = min(min_distance, distance)
+            h_n += min_distance
+    return h_n
 
-def a_star(start, goal, heuristic, time_limit=100):  # Agregamos el parámetro time_limit
-    start_time = time.time()  # Registramos el tiempo de inicio
-    
+def get_h_n(current_board_state, goal, heuristic):
+    if heuristic == "manhattan":
+        return manhattan_heuristic(current_board_state, goal)
+    return 0
+
+def a_star(start, goal, heuristic, time_limit=200):
+    start_time = time.time()
     start_state = state(start, 0)
     start_state.h_n = get_h_n(start_state.board_state, goal, heuristic)
     start_state.get_f_n()
-
     search_space = PriorityQueue()
     search_space.put((start_state.f_n, start_state))
     seen_states = set()
 
     while not search_space.empty():
-        # Verificar si se excedió el límite de tiempo
         if time.time() - start_time > time_limit:
             print(f"Tiempo límite de {time_limit} segundos excedido")
             return None
@@ -152,7 +131,7 @@ def a_star(start, goal, heuristic, time_limit=100):  # Agregamos el parámetro t
         
         if current_state_str in seen_states:
             continue
-        else: 
+        else:
             if check_goal(current_state.board_state, goal):
                 elapsed_time = time.time() - start_time
                 print(f"Solución encontrada en {elapsed_time:.2f} segundos")
@@ -173,31 +152,6 @@ def a_star(start, goal, heuristic, time_limit=100):  # Agregamos el parámetro t
 
     return None
 
-
-def manhattan_heuristic(current_board_state, goal):
-    # for this heuristc h_n is the total distance 
-    # between all the goal board's tiles color and the closest tile of the same color on the current board
-    h_n = 0
-    # Calculate for the 3x3 center pattern
-    for target_y in range(3):
-        for target_x in range(3):
-            target_tile = goal[target_y][target_x]
-            # Find the closest matching tile
-            min_distance = float('inf')
-            for current_y in range(5):
-                for current_x in range(5):
-                    if current_board_state[current_y][current_x] == target_tile:
-                        distance = abs(current_x - (target_x+1)) + abs(current_y - (target_y+1))
-                        min_distance = min(min_distance, distance)
-            h_n += min_distance
-    return h_n
-
-def get_h_n(current_board_state, goal, heuristic):
-    if (heuristic == "manhattan"):
-        h_n = manhattan_heuristic(current_board_state, goal)
-    return h_n
-
-    
 @app.post("/api/solve")
 async def solve_puzzle(data: BoardData):
     try:
@@ -223,7 +177,7 @@ async def solve_puzzle(data: BoardData):
         if solution:
             solution_steps = []
             
-            for step in solution[1:]:  # Ignorar el estado inicial
+            for step in solution[1:]:
                 board_state = step["board_state"]
                 from_pos = step["from_pos"]
                 to_pos = step["to_pos"]
@@ -237,7 +191,6 @@ async def solve_puzzle(data: BoardData):
                 }
                 solution_steps.append(step_info)
 
-            #imprimir los movement de solutionsteps
             print("Movimientos de la solución:")
             for step in solution_steps:
                 print(step["movement"])

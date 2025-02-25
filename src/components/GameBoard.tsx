@@ -144,7 +144,7 @@ const GameBoard = () => {
 
   const parseBoard = (boardString: string, size: number) => {
     const rows = boardString.split(',');
-    return rows.map(row => row.split('').map(char => {
+    return rows.slice(0, size).map(row => row.slice(0,size).split("").map(char => {
       switch (char) {
         case 'Y': return COLORS.YELLOW;
         case 'G': return COLORS.GREEN;
