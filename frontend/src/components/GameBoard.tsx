@@ -360,7 +360,7 @@ const GameBoard = () => {
                           <Cell 
                             key={`history-${index}-${i}-${j}`} 
                             color={color}
-                            size="small"
+                            size="tiny"
                           />
                         ))
                       )}
