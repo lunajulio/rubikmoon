@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import Cell from './Cell';
 import Modal from './Modal';
+import SolutionModal from './SolutionModal';
 
 const COLORS = {
   YELLOW: '#ffd000',
@@ -15,17 +16,21 @@ const COLORS = {
 };
 
 const GameBoard = () => {
-  const [mainBoard, setMainBoard] = React.useState<string[][]>([]);
-  const [miniBoard, setMiniBoard] = React.useState<string[][]>([]);
-  const [solution, setSolution] = React.useState<any[]>([]);
-  const [currentStep, setCurrentStep] = React.useState(0);
-  const [isSolving, setIsSolving] = React.useState(false);
-  const [currentInstruction, setCurrentInstruction] = React.useState<string>("");
-  const [solutionSteps, setSolutionSteps] = React.useState<any[]>([]);
-  const [currentStepIndex, setCurrentStepIndex] = React.useState<number>(0);
-  const [isGuiding, setIsGuiding] = React.useState<boolean>(false);
-  const [isModalOpen, setIsModalOpen] = React.useState<boolean>(false);
-  const [boardHistory, setBoardHistory] = React.useState<string[][][]>([]);
+  const [mainBoard, setMainBoard] = useState<string[][]>([]);
+  const [miniBoard, setMiniBoard] = useState<string[][]>([]);
+  const [solution, setSolution] = useState<any[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isSolving, setIsSolving] = useState(false);
+  const [currentInstruction, setCurrentInstruction] = useState<string>("");
+  const [solutionSteps, setSolutionSteps] = useState<any[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const [isGuiding, setIsGuiding] = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [boardHistory, setBoardHistory] = useState<string[][][]>([]);
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const [currentBoardIndex, setCurrentBoardIndex] = useState<number>(0);
+  const [isSolutionModalOpen, setIsSolutionModalOpen] = useState(false);
+  const [solutionData, setSolutionData] = useState({ steps: 0, time: '0.00' });
 
   const findEmptyCell = () => {
     for (let i = 0; i < 5; i++) {
@@ -53,9 +58,10 @@ const GameBoard = () => {
     
     // Verificar si el movimiento es válido
     if (!isValidMove(row, col)) {
-      console.log("Movimiento no válido: la ficha debe estar junto al espacio vacío");
       return;
     }
+
+    
   
     // Si estamos en modo guiado
     if (isGuiding && currentStepIndex < solutionSteps.length) {
@@ -64,19 +70,30 @@ const GameBoard = () => {
       
       // Verificar si es el movimiento esperado
       if (row !== expectedRow || col !== expectedCol) {
-        console.log("Movimiento no esperado en modo guiado");
         return;
       }
   
-      // Realizar el movimiento
-          // Guardar el estado actual del tablero en el historial
-      setBoardHistory(prevHistory => [...prevHistory, mainBoard.map(row => [...row])]);
       const newBoard = mainBoard.map(row => [...row]);
       [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
       [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
       
       setMainBoard(newBoard);
-  
+
+      if (boardHistory.length === 0){
+          setBoardHistory([mainBoard]);
+      }
+      
+      setBoardHistory(prevHistory => {
+        const lastBoard = prevHistory[prevHistory.length - 1];
+        if (JSON.stringify(lastBoard) !== JSON.stringify(newBoard)) {
+          return [...prevHistory, newBoard];
+        }
+        return prevHistory;
+      });
+
+      // Actualizamos el índice al último estado
+      setCurrentBoardIndex(boardHistory.length);
+
       // Avanzar al siguiente paso
       if (currentStepIndex < solutionSteps.length - 1) {
         const nextIndex = currentStepIndex + 1;
@@ -128,7 +145,6 @@ const GameBoard = () => {
       
       // Verificar si el movimiento es válido
       if (!isValidMoveForBoard(targetRow, targetCol, currentBoard)) {
-        console.error("Solución inválida: movimiento no permitido");
         return false;
       }
       
@@ -144,7 +160,7 @@ const GameBoard = () => {
 
   const parseBoard = (boardString: string, size: number) => {
     const rows = boardString.split(',');
-    return rows.slice(0, size).map(row => row.slice(0,size).split("").map(char => {
+    return rows.slice(0, size).map(row => row.slice(0, size).split('').map(char => {
       switch (char) {
         case 'Y': return COLORS.YELLOW;
         case 'G': return COLORS.GREEN;
@@ -201,7 +217,12 @@ const GameBoard = () => {
           setIsGuiding(true);
           setCurrentInstruction(data.solution[0].direction);
       
-          alert(`¡Solución encontrada!\nNúmero de pasos: ${data.solution.length}\nTiempo: ${data.time} segundos`);
+          setSolutionData({
+            steps: data.steps,
+            time: data.time
+          });
+          setIsSolutionModalOpen(true);
+
         } else {
           alert('La solución recibida contiene movimientos inválidos');
         }
@@ -213,6 +234,24 @@ const GameBoard = () => {
       alert('Error al buscar solución');
     } finally {
       setIsSolving(false);
+    }
+  };
+
+  const scrollLeft = () => {
+    if (currentBoardIndex > 0) {
+      setCurrentBoardIndex(prev => prev - 1);
+      if (sliderRef.current) {
+        sliderRef.current.scrollLeft -= 200;
+      }
+    }
+  };
+  
+  const scrollRight = () => {
+    if (currentBoardIndex < boardHistory.length - 1) {
+      setCurrentBoardIndex(prev => prev + 1);
+      if (sliderRef.current) {
+        sliderRef.current.scrollLeft += 200;
+      }
     }
   };
 
@@ -234,74 +273,125 @@ const GameBoard = () => {
     loadBoardsFromFile();
   }, []);
 
-  return (
-    <div className="flex w-full h-[calc(100vh-64px)]">
-      {/* Columna izquierda - Tableros */}
-      <div className="w-1/3 flex flex-col items-center justify-center gap-8 p-8 bg-black">
-        {/* Mini tablero (objetivo) */}
-        <div className="grid grid-cols-3 gap-1">
-          {miniBoard.map((row, i) =>
-            row.map((color, j) => (
-              <Cell key={`mini-${i}-${j}`} color={color} size="small" />
-            ))
-          )}
-        </div>
 
-        {/* Tablero principal */}
-        <div className="p-4 bg-black rounded-lg">
-          <div className="grid grid-cols-5 gap-1">
-            {mainBoard.map((row, i) =>
+  return (
+    <div className="flex flex-col h-full">
+
+      <div className="flex flex-1">
+        {/* Columna izquierda - Tableros */}
+        <div className="w-2/3 flex flex-col items-center justify-center gap-8 p-8 bg-black">
+          {/* Mini tablero (objetivo) */}
+          <div className="grid grid-cols-3 gap-1">
+            {miniBoard.map((row, i) =>
               row.map((color, j) => (
-                <Cell 
-                  key={`main-${i}-${j}`} 
-                  color={color}
-                  onClick={() => handleMove(i, j)}
-                />
+                <Cell key={`mini-${i}-${j}`} color={color} size="small" />
               ))
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Columna central - Botones */}
-      <div className="w-1/3 flex flex-col items-center justify-center gap-4 p-8 bg-black">
-        <button 
-          onClick={loadBoardsFromFile}
-          className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-        >
-          Generar Nuevos Tableros
-        </button>
-
-        <button 
-          onClick={solvePuzzle}
-          disabled={isSolving}
-          className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-        >
-          {isSolving ? 'Resolviendo...' : 'Resolver Puzzle'}
-        </button>
-      </div>
-
-      {/* Columna derecha - Historial */}
-      <div className="w-1/3 flex flex-col items-center justify-center gap-4 p-8 bg-black overflow-y-auto h-full">
-        <h2 className="text-white text-xl mb-4">Historial de Tableros</h2>
-        {boardHistory.map((board, index) => (
-          <div key={index} className="mb-4">
+          {/* Tablero principal */}
+          <div className="p-4 bg-black rounded-lg">
             <div className="grid grid-cols-5 gap-1">
-              {board.map((row, i) =>
+              {mainBoard.map((row, i) =>
                 row.map((color, j) => (
-                  <Cell key={`history-${index}-${i}-${j}`} color={color} size="small" />
+                  <Cell 
+                    key={`main-${i}-${j}`} 
+                    color={color}
+                    onClick={() => handleMove(i, j)}
+                  />
                 ))
               )}
             </div>
           </div>
-        ))}
+        </div>
+
+        {/* Columna derecha - Botones */}
+        <div className="w-1/3 flex flex-col items-center justify-center gap-4 p-8 bg-black">
+          <button 
+            onClick={loadBoardsFromFile}
+            className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            Generar Nuevos Tableros
+          </button>
+
+          <button 
+            onClick={solvePuzzle}
+            disabled={isSolving}
+            className="w-64 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            {isSolving ? 'Resolviendo...' : 'Resolver Puzzle'}
+          </button>
+        </div>
       </div>
+
+        {/* Slider de historial - En la parte inferior */}
+        {boardHistory.length >= 2 && (
+          <div className="w-full px-8 pb-8">
+            <div className="w-full flex items-center justify-center gap-4 p-4 bg-gray-800 rounded-lg">
+              <button 
+                onClick={scrollLeft}
+                disabled={currentBoardIndex === 0}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+              >
+                ←
+              </button>
+
+              <div 
+                ref={sliderRef} 
+                className="flex overflow-x-auto transition-all duration-300 ease-in-out"
+                style={{
+                  maxWidth: '800px',
+                  scrollBehavior: 'smooth',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }}
+              >
+                {boardHistory.map((board, index) => (
+                  <div 
+                    key={index}
+                    className={`flex-shrink-0 p-2 transition-all duration-200 ${
+                      currentBoardIndex === index ? 'border-2 border-blue-500' : ''
+                    }`}
+                  >
+                    <div className="grid grid-cols-5 gap-1">
+                      {board.map((row, i) =>
+                        row.map((color, j) => (
+                          <Cell 
+                            key={`history-${index}-${i}-${j}`} 
+                            color={color}
+                            size="small"
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button 
+                onClick={scrollRight}
+                disabled={currentBoardIndex === boardHistory.length - 1}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+              >
+                →
+              </button>
+            </div>
+          </div>
+        )}
 
       {/* Modal */}
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onPlayAgain={handlePlayAgain} 
+      />
+
+      <SolutionModal
+        isOpen={isSolutionModalOpen}
+        onClose={() => setIsSolutionModalOpen(false)}
+        steps={solutionData.steps}
+        time={parseFloat(solutionData.time)}
       />
     </div>
   );
