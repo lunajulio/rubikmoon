@@ -45,8 +45,6 @@ def check_goal(current_board_state, goal):
 
 def get_path(current_state):
     path = []
-    previous_state = None
-    
     while current_state:
         empty_pos = None
         for i in range(5):
@@ -56,18 +54,27 @@ def get_path(current_state):
                     break
             if empty_pos:
                 break
-                
-        if previous_state:
+
+        # Verificar si current_state.movement es None
+        if current_state.movement is not None:
             path.append({
                 "board_state": current_state.board_state,
                 "from_pos": current_state.movement,
                 "to_pos": empty_pos,
             })
-            
-        previous_state = current_state
+        else:
+            # Si current_state.movement es None, manejarlo de alguna manera
+            # Por ejemplo, puedes omitir este paso o establecer un valor predeterminado
+            print("Advertencia: current_state.movement es None")
+            path.append({
+                "board_state": current_state.board_state,
+                "from_pos": (-1, -1),  # Valor predeterminado
+                "to_pos": empty_pos,
+            })
+
         current_state = current_state.parent
-        
-    return path[::-1]
+
+    return path[::-1]  # Invertir la lista para obtener el camino correcto
 
 def get_possible_moves(current_board_state):
     empty_cell_pos = None
@@ -177,7 +184,7 @@ async def solve_puzzle(data: BoardData):
         if solution:
             solution_steps = []
             
-            for step in solution[1:]:
+            for step in solution:
                 board_state = step["board_state"]
                 from_pos = step["from_pos"]
                 to_pos = step["to_pos"]
@@ -190,6 +197,7 @@ async def solve_puzzle(data: BoardData):
                     "movement": from_pos,
                 }
                 solution_steps.append(step_info)
+                
 
             print("Movimientos de la solución:")
             for step in solution_steps:
@@ -204,6 +212,7 @@ async def solve_puzzle(data: BoardData):
         else:
             return {
                 "success": False,
+                "solution": [],
                 "message": "No se encontró solución"
             }
 

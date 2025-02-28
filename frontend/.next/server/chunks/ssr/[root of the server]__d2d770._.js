@@ -17,20 +17,42 @@ __turbopack_esm__({
     "default": (()=>__TURBOPACK__default__export__)
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_import__("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
+(()=>{
+    const e = new Error("Cannot find module 'styled-components'");
+    e.code = 'MODULE_NOT_FOUND';
+    throw e;
+})();
 'use client';
 ;
-const Cell = ({ color, size = 'normal', onClick })=>{
-    const cellSize = size === 'tiny' ? 'w-4 h-4' : size === 'small' ? 'w-8 h-8' : 'w-16 h-16';
-    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: `${cellSize} border-2 border-gray-800 rounded-sm cursor-pointer transition-all duration-200 hover:opacity-80`,
-        style: {
-            backgroundColor: color
-        },
-        onClick: onClick
+;
+// Definir la animación de temblor
+const shake = keyframes`
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+`;
+// Definir el componente de celda con la animación de temblor
+const StyledCell = styled.div`
+  width: ${({ size })=>size === 'small' ? '30px' : size === 'tiny' ? '20px' : '40px'};
+  height: ${({ size })=>size === 'small' ? '30px' : size === 'tiny' ? '20px' : '40px'};
+  background-color: ${({ color })=>color};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  animation: ${({ isShaking })=>isShaking ? `${shake} 0.5s` : 'none'};
+`;
+const Cell = ({ color, onClick, isShaking = false, size = 'default' })=>{
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(StyledCell, {
+        color: color,
+        onClick: onClick,
+        isShaking: isShaking,
+        size: size
     }, void 0, false, {
         fileName: "[project]/src/components/Cell.tsx",
-        lineNumber: 18,
-        columnNumber: 5
+        lineNumber: 34,
+        columnNumber: 10
     }, this);
 };
 const __TURBOPACK__default__export__ = Cell;
@@ -272,6 +294,8 @@ const GameBoard = ()=>{
         steps: 0,
         time: '0.00'
     });
+    const [isPuzzleCompleted, setIsPuzzleCompleted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [shakingCell, setShakingCell] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(null);
     const findEmptyCell = ()=>{
         for(let i = 0; i < 5; i++){
             for(let j = 0; j < 5; j++){
@@ -292,10 +316,31 @@ const GameBoard = ()=>{
         const emptyCell = findEmptyCell();
         return row === emptyCell.row + 1 && col === emptyCell.col || row === emptyCell.row - 1 && col === emptyCell.col || row === emptyCell.row && col === emptyCell.col + 1 || row === emptyCell.row && col === emptyCell.col - 1;
     };
+    const checkIfPuzzleCompleted = ()=>{
+        for(let i = 0; i < miniBoard.length; i++){
+            for(let j = 0; j < miniBoard[i].length; j++){
+                if (mainBoard[i][j] !== miniBoard[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
     const handleMove = (row, col)=>{
+        // No permitir movimientos si el puzzle está completado
+        if (isPuzzleCompleted) {
+            return;
+        }
         const emptyCell = findEmptyCell();
         // Verificar si el movimiento es válido
         if (!isValidMove(row, col)) {
+            setShakingCell({
+                row,
+                col
+            });
+            setTimeout(()=>{
+                setShakingCell(null);
+            }, 500);
             return;
         }
         // Si estamos en modo guiado
@@ -304,6 +349,13 @@ const GameBoard = ()=>{
             const [expectedRow, expectedCol] = currentStep.movement;
             // Verificar si es el movimiento esperado
             if (row !== expectedRow || col !== expectedCol) {
+                setShakingCell({
+                    row,
+                    col
+                });
+                setTimeout(()=>{
+                    setShakingCell(null);
+                }, 500);
                 return;
             }
             const newBoard = mainBoard.map((row)=>[
@@ -322,24 +374,30 @@ const GameBoard = ()=>{
             setBoardHistory((prevHistory)=>{
                 const lastBoard = prevHistory[prevHistory.length - 1];
                 if (JSON.stringify(lastBoard) !== JSON.stringify(newBoard)) {
-                    return [
+                    const updatedHistory = [
                         ...prevHistory,
                         newBoard
                     ];
+                    setCurrentBoardIndex(updatedHistory.length - 1);
+                    return updatedHistory;
                 }
                 return prevHistory;
             });
-            // Actualizamos el índice al último estado
-            setCurrentBoardIndex(boardHistory.length);
             // Avanzar al siguiente paso
             if (currentStepIndex < solutionSteps.length - 1) {
                 const nextIndex = currentStepIndex + 1;
                 setCurrentStepIndex(nextIndex);
-                setCurrentInstruction(solutionSteps[nextIndex].direction);
+                // Establecer la instrucción del siguiente movimiento
+                if (solutionSteps[nextIndex]?.direction) {
+                    setCurrentInstruction(solutionSteps[nextIndex].direction);
+                } else {
+                    setCurrentInstruction("Siguiente movimiento");
+                }
             } else {
                 setIsGuiding(false);
                 setCurrentInstruction("¡Puzzle completado!");
                 setIsModalOpen(true);
+                setIsPuzzleCompleted(true); // Marcar el puzzle como completado
             }
         } else {
             // Movimiento normal fuera del modo guiado
@@ -351,6 +409,24 @@ const GameBoard = ()=>{
                 newBoard[emptyCell.row][emptyCell.col]
             ];
             setMainBoard(newBoard);
+            setBoardHistory((prevHistory)=>{
+                const lastBoard = prevHistory[prevHistory.length - 1];
+                if (JSON.stringify(lastBoard) !== JSON.stringify(newBoard)) {
+                    const updatedHistory = [
+                        ...prevHistory,
+                        newBoard
+                    ];
+                    setCurrentBoardIndex(updatedHistory.length - 1);
+                    return updatedHistory;
+                }
+                return prevHistory;
+            });
+            // Verificar si el puzzle está completado
+            if (checkIfPuzzleCompleted()) {
+                setIsPuzzleCompleted(true);
+                setCurrentInstruction("¡Puzzle completado!");
+                setIsModalOpen(true);
+            }
         }
     };
     const findEmptyCellInBoard = (board)=>{
@@ -374,12 +450,21 @@ const GameBoard = ()=>{
         return row === emptyCell.row + 1 && col === emptyCell.col || row === emptyCell.row - 1 && col === emptyCell.col || row === emptyCell.row && col === emptyCell.col + 1 || row === emptyCell.row && col === emptyCell.col - 1;
     };
     const validateSolution = (steps)=>{
+        // Verificar si steps es null o undefined
+        if (!steps || !Array.isArray(steps)) {
+            console.error("La solución no es válida o está vacía");
+            return false;
+        }
         let currentBoard = mainBoard.map((row)=>[
                 ...row
             ]);
         for (const step of steps){
-            const emptyCell = findEmptyCellInBoard(currentBoard);
             const [targetRow, targetCol] = step.movement;
+            // Ignorar el movimiento si es el valor por defecto (-1, -1)
+            if (targetRow === -1 && targetCol === -1) {
+                continue; // Saltar este paso y continuar con el siguiente
+            }
+            const emptyCell = findEmptyCellInBoard(currentBoard);
             // Verificar si el movimiento es válido
             if (!isValidMoveForBoard(targetRow, targetCol, currentBoard)) {
                 return false;
@@ -424,6 +509,7 @@ const GameBoard = ()=>{
         setCurrentStep(0);
         setIsSolving(false);
         setBoardHistory([]);
+        setIsPuzzleCompleted(false); // Reiniciar el estado del puzzle completado
         const response = await fetch('/test-cases.txt');
         const fileContent = await response.text();
         const cases = fileContent.split('\n').filter((line)=>line.trim() !== '');
@@ -449,13 +535,19 @@ const GameBoard = ()=>{
             });
             const data = await response.json();
             console.log('Solución recibida:', data);
-            if (data.success && data.solution && data.solution.length > 0) {
+            if (data.success && Array.isArray(data.solution) && data.solution.length > 0) {
                 // Validar que cada paso de la solución es válido
                 if (validateSolution(data.solution)) {
                     setSolutionSteps(data.solution);
-                    setCurrentStepIndex(0);
+                    // Comenzar el modo guiado desde el segundo movimiento (índice 1)
+                    setCurrentStepIndex(1); // Ignorar el primer movimiento (-1, -1)
                     setIsGuiding(true);
-                    setCurrentInstruction(data.solution[0].direction);
+                    // Establecer la instrucción del segundo movimiento
+                    if (data.solution[1]?.direction) {
+                        setCurrentInstruction(data.solution[1].direction);
+                    } else {
+                        setCurrentInstruction("Movimiento inicial");
+                    }
                     setSolutionData({
                         steps: data.steps,
                         time: data.time
@@ -520,12 +612,12 @@ const GameBoard = ()=>{
                                             size: "small"
                                         }, `mini-${i}-${j}`, false, {
                                             fileName: "[project]/src/components/GameBoard.tsx",
-                                            lineNumber: 287,
+                                            lineNumber: 355,
                                             columnNumber: 17
                                         }, this)))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/GameBoard.tsx",
-                                lineNumber: 284,
+                                lineNumber: 352,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -534,26 +626,27 @@ const GameBoard = ()=>{
                                     className: "grid grid-cols-5 gap-1",
                                     children: mainBoard.map((row, i)=>row.map((color, j)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$Cell$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                                 color: color,
-                                                onClick: ()=>handleMove(i, j)
+                                                onClick: ()=>handleMove(i, j),
+                                                isShaking: shakingCell?.row === i && shakingCell?.col === j
                                             }, `main-${i}-${j}`, false, {
                                                 fileName: "[project]/src/components/GameBoard.tsx",
-                                                lineNumber: 297,
+                                                lineNumber: 365,
                                                 columnNumber: 19
                                             }, this)))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/GameBoard.tsx",
-                                    lineNumber: 294,
+                                    lineNumber: 362,
                                     columnNumber: 13
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/GameBoard.tsx",
-                                lineNumber: 293,
+                                lineNumber: 361,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/GameBoard.tsx",
-                        lineNumber: 282,
+                        lineNumber: 350,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -565,7 +658,7 @@ const GameBoard = ()=>{
                                 children: "Generar Nuevos Tableros"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/GameBoard.tsx",
-                                lineNumber: 310,
+                                lineNumber: 379,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -575,25 +668,25 @@ const GameBoard = ()=>{
                                 children: isSolving ? 'Resolviendo...' : 'Resolver Puzzle'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/GameBoard.tsx",
-                                lineNumber: 317,
+                                lineNumber: 386,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/GameBoard.tsx",
-                        lineNumber: 309,
+                        lineNumber: 378,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/GameBoard.tsx",
-                lineNumber: 280,
+                lineNumber: 348,
                 columnNumber: 7
             }, this),
             boardHistory.length >= 2 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "w-full px-8 pb-8",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "w-full flex items-center justify-center gap-4 p-4 bg-gray-800 rounded-lg",
+                    className: "w-full flex items-center justify-center gap-4 p-4 rounded-lg",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: scrollLeft,
@@ -602,8 +695,8 @@ const GameBoard = ()=>{
                             children: "←"
                         }, void 0, false, {
                             fileName: "[project]/src/components/GameBoard.tsx",
-                            lineNumber: 331,
-                            columnNumber: 15
+                            lineNumber: 400,
+                            columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             ref: sliderRef,
@@ -618,29 +711,29 @@ const GameBoard = ()=>{
                             children: boardHistory.map((board, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: `flex-shrink-0 p-2 transition-all duration-200 ${currentBoardIndex === index ? 'border-2 border-blue-500' : ''}`,
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "grid grid-cols-5 gap-1",
+                                        className: "grid grid-cols-5 gap-0.3",
                                         children: board.map((row, i)=>row.map((color, j)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$Cell$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                                     color: color,
                                                     size: "tiny"
                                                 }, `history-${index}-${i}-${j}`, false, {
                                                     fileName: "[project]/src/components/GameBoard.tsx",
-                                                    lineNumber: 360,
-                                                    columnNumber: 27
+                                                    lineNumber: 429,
+                                                    columnNumber: 25
                                                 }, this)))
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/GameBoard.tsx",
-                                        lineNumber: 357,
-                                        columnNumber: 21
+                                        lineNumber: 426,
+                                        columnNumber: 19
                                     }, this)
                                 }, index, false, {
                                     fileName: "[project]/src/components/GameBoard.tsx",
-                                    lineNumber: 351,
-                                    columnNumber: 19
+                                    lineNumber: 420,
+                                    columnNumber: 17
                                 }, this))
                         }, void 0, false, {
                             fileName: "[project]/src/components/GameBoard.tsx",
-                            lineNumber: 339,
-                            columnNumber: 15
+                            lineNumber: 408,
+                            columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                             onClick: scrollRight,
@@ -649,19 +742,19 @@ const GameBoard = ()=>{
                             children: "→"
                         }, void 0, false, {
                             fileName: "[project]/src/components/GameBoard.tsx",
-                            lineNumber: 372,
-                            columnNumber: 15
+                            lineNumber: 441,
+                            columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/GameBoard.tsx",
-                    lineNumber: 330,
-                    columnNumber: 13
+                    lineNumber: 399,
+                    columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/GameBoard.tsx",
-                lineNumber: 329,
-                columnNumber: 11
+                lineNumber: 398,
+                columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$Modal$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                 isOpen: isModalOpen,
@@ -669,7 +762,7 @@ const GameBoard = ()=>{
                 onPlayAgain: handlePlayAgain
             }, void 0, false, {
                 fileName: "[project]/src/components/GameBoard.tsx",
-                lineNumber: 384,
+                lineNumber: 453,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$SolutionModal$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
@@ -679,13 +772,13 @@ const GameBoard = ()=>{
                 time: parseFloat(solutionData.time)
             }, void 0, false, {
                 fileName: "[project]/src/components/GameBoard.tsx",
-                lineNumber: 390,
+                lineNumber: 459,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/GameBoard.tsx",
-        lineNumber: 278,
+        lineNumber: 347,
         columnNumber: 5
     }, this);
 };

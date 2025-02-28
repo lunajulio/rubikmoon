@@ -31,6 +31,8 @@ const GameBoard = () => {
   const [currentBoardIndex, setCurrentBoardIndex] = useState<number>(0);
   const [isSolutionModalOpen, setIsSolutionModalOpen] = useState(false);
   const [solutionData, setSolutionData] = useState({ steps: 0, time: '0.00' });
+  const [isPuzzleCompleted, setIsPuzzleCompleted] = useState<boolean>(false);
+  const [shakingCell, setShakingCell] = useState<{ row: number; col: number } | null>(null);
 
   const findEmptyCell = () => {
     for (let i = 0; i < 5; i++) {
@@ -53,66 +55,115 @@ const GameBoard = () => {
     );
   };
 
+  const checkIfPuzzleCompleted = () => {
+    for (let i = 0; i < miniBoard.length; i++) {
+      for (let j = 0; j < miniBoard[i].length; j++) {
+        if (mainBoard[i][j] !== miniBoard[i][j]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const handleMove = (row: number, col: number) => {
-    const emptyCell = findEmptyCell();
-    
-    // Verificar si el movimiento es válido
-    if (!isValidMove(row, col)) {
+    // No permitir movimientos si el puzzle está completado
+    if (isPuzzleCompleted) {
       return;
     }
+  
+    const emptyCell = findEmptyCell();
+  
+    // Verificar si el movimiento es válido
+    if (!isValidMove(row, col)) {
 
-    
+      setShakingCell({ row, col });
+      setTimeout(() => {
+        setShakingCell(null);
+      }, 500);
+      return;
+    }
   
     // Si estamos en modo guiado
     if (isGuiding && currentStepIndex < solutionSteps.length) {
       const currentStep = solutionSteps[currentStepIndex];
       const [expectedRow, expectedCol] = currentStep.movement;
-      
+  
       // Verificar si es el movimiento esperado
       if (row !== expectedRow || col !== expectedCol) {
+        setShakingCell({ row, col });
+        setTimeout(() => {
+          setShakingCell(null);
+        }, 500);
         return;
       }
   
-      const newBoard = mainBoard.map(row => [...row]);
-      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
-      [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
-      
+      const newBoard = mainBoard.map((row) => [...row]);
+      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = [
+        newBoard[row][col],
+        newBoard[emptyCell.row][emptyCell.col],
+      ];
+  
       setMainBoard(newBoard);
-
-      if (boardHistory.length === 0){
-          setBoardHistory([mainBoard]);
+  
+      if (boardHistory.length === 0) {
+        setBoardHistory([mainBoard]);
       }
-      
-      setBoardHistory(prevHistory => {
+  
+      setBoardHistory((prevHistory) => {
         const lastBoard = prevHistory[prevHistory.length - 1];
         if (JSON.stringify(lastBoard) !== JSON.stringify(newBoard)) {
-          return [...prevHistory, newBoard];
+          const updatedHistory = [...prevHistory, newBoard];
+          setCurrentBoardIndex(updatedHistory.length - 1);
+          return updatedHistory;
         }
         return prevHistory;
       });
-
-      // Actualizamos el índice al último estado
-      setCurrentBoardIndex(boardHistory.length);
-
+  
       // Avanzar al siguiente paso
       if (currentStepIndex < solutionSteps.length - 1) {
         const nextIndex = currentStepIndex + 1;
         setCurrentStepIndex(nextIndex);
-        setCurrentInstruction(solutionSteps[nextIndex].direction);
+  
+        // Establecer la instrucción del siguiente movimiento
+        if (solutionSteps[nextIndex]?.direction) {
+          setCurrentInstruction(solutionSteps[nextIndex].direction);
+        } else {
+          setCurrentInstruction("Siguiente movimiento");
+        }
       } else {
         setIsGuiding(false);
         setCurrentInstruction("¡Puzzle completado!");
         setIsModalOpen(true);
+        setIsPuzzleCompleted(true); // Marcar el puzzle como completado
       }
     } else {
       // Movimiento normal fuera del modo guiado
-      const newBoard = mainBoard.map(row => [...row]);
-      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = 
-      [newBoard[row][col], newBoard[emptyCell.row][emptyCell.col]];
-      
+      const newBoard = mainBoard.map((row) => [...row]);
+      [newBoard[emptyCell.row][emptyCell.col], newBoard[row][col]] = [
+        newBoard[row][col],
+        newBoard[emptyCell.row][emptyCell.col],
+      ];
+  
       setMainBoard(newBoard);
+  
+      setBoardHistory((prevHistory) => {
+        const lastBoard = prevHistory[prevHistory.length - 1];
+        if (JSON.stringify(lastBoard) !== JSON.stringify(newBoard)) {
+          const updatedHistory = [...prevHistory, newBoard];
+          setCurrentBoardIndex(updatedHistory.length - 1);
+          return updatedHistory;
+        }
+        return prevHistory;
+      });
+  
+      // Verificar si el puzzle está completado
+      if (checkIfPuzzleCompleted()) {
+        setIsPuzzleCompleted(true);
+        setCurrentInstruction("¡Puzzle completado!");
+        setIsModalOpen(true);
+      }
     }
-
   };
 
   const findEmptyCellInBoard = (board: string[][]) => {
@@ -137,24 +188,36 @@ const GameBoard = () => {
   };
 
   const validateSolution = (steps: any[]) => {
+    // Verificar si steps es null o undefined
+    if (!steps || !Array.isArray(steps)) {
+      console.error("La solución no es válida o está vacía");
+      return false;
+    }
+  
     let currentBoard = mainBoard.map(row => [...row]);
-    
+  
     for (const step of steps) {
-      const emptyCell = findEmptyCellInBoard(currentBoard);
       const [targetRow, targetCol] = step.movement;
-      
+  
+      // Ignorar el movimiento si es el valor por defecto (-1, -1)
+      if (targetRow === -1 && targetCol === -1) {
+        continue; // Saltar este paso y continuar con el siguiente
+      }
+  
+      const emptyCell = findEmptyCellInBoard(currentBoard);
+  
       // Verificar si el movimiento es válido
       if (!isValidMoveForBoard(targetRow, targetCol, currentBoard)) {
         return false;
       }
-      
+  
       // Actualizar el tablero
       const newBoard = currentBoard.map(row => [...row]);
       [newBoard[emptyCell.row][emptyCell.col], newBoard[targetRow][targetCol]] = 
       [newBoard[targetRow][targetCol], newBoard[emptyCell.row][emptyCell.col]];
       currentBoard = newBoard;
     }
-    
+  
     return true;
   };
 
@@ -179,6 +242,7 @@ const GameBoard = () => {
     setCurrentStep(0);
     setIsSolving(false);
     setBoardHistory([]);
+    setIsPuzzleCompleted(false); // Reiniciar el estado del puzzle completado
     const response = await fetch('/test-cases.txt');
     const fileContent = await response.text();
     const cases = fileContent.split('\n').filter(line => line.trim() !== '');
@@ -202,27 +266,34 @@ const GameBoard = () => {
         },
         body: JSON.stringify({
           mainBoard,
-          targetBoard: miniBoard
-        })
+          targetBoard: miniBoard,
+        }),
       });
   
       const data = await response.json();
       console.log('Solución recibida:', data);
   
-      if (data.success && data.solution && data.solution.length > 0) {
+      if (data.success && Array.isArray(data.solution) && data.solution.length > 0) {
         // Validar que cada paso de la solución es válido
         if (validateSolution(data.solution)) {
           setSolutionSteps(data.solution);
-          setCurrentStepIndex(0);
+  
+          // Comenzar el modo guiado desde el segundo movimiento (índice 1)
+          setCurrentStepIndex(1); // Ignorar el primer movimiento (-1, -1)
           setIsGuiding(true);
-          setCurrentInstruction(data.solution[0].direction);
-      
+  
+          // Establecer la instrucción del segundo movimiento
+          if (data.solution[1]?.direction) {
+            setCurrentInstruction(data.solution[1].direction);
+          } else {
+            setCurrentInstruction("Movimiento inicial");
+          }
+  
           setSolutionData({
             steps: data.steps,
-            time: data.time
+            time: data.time,
           });
           setIsSolutionModalOpen(true);
-
         } else {
           alert('La solución recibida contiene movimientos inválidos');
         }
@@ -266,17 +337,14 @@ const GameBoard = () => {
     resetGuide();
     setBoardHistory([]);
     loadBoardsFromFile();
-
   };
 
   React.useEffect(() => {
     loadBoardsFromFile();
   }, []);
 
-
   return (
     <div className="flex flex-col h-full">
-
       <div className="flex flex-1">
         {/* Columna izquierda - Tableros */}
         <div className="w-2/3 flex flex-col items-center justify-center gap-8 p-8 bg-black">
@@ -298,6 +366,7 @@ const GameBoard = () => {
                     key={`main-${i}-${j}`} 
                     color={color}
                     onClick={() => handleMove(i, j)}
+                    isShaking={shakingCell?.row === i && shakingCell?.col === j}
                   />
                 ))
               )}
@@ -324,61 +393,61 @@ const GameBoard = () => {
         </div>
       </div>
 
-        {/* Slider de historial - En la parte inferior */}
-        {boardHistory.length >= 2 && (
-          <div className="w-full px-8 pb-8">
-            <div className="w-full flex items-center justify-center gap-4 p-4 bg-gray-800 rounded-lg">
-              <button 
-                onClick={scrollLeft}
-                disabled={currentBoardIndex === 0}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
-              >
-                ←
-              </button>
+      {/* Slider de historial - En la parte inferior */}
+      {boardHistory.length >= 2 && (
+        <div className="w-full px-8 pb-8">
+          <div className="w-full flex items-center justify-center gap-4 p-4 rounded-lg">
+            <button 
+              onClick={scrollLeft}
+              disabled={currentBoardIndex === 0}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              ←
+            </button>
 
-              <div 
-                ref={sliderRef} 
-                className="flex overflow-x-auto transition-all duration-300 ease-in-out"
-                style={{
-                  maxWidth: '800px',
-                  scrollBehavior: 'smooth',
-                  WebkitOverflowScrolling: 'touch',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
-                }}
-              >
-                {boardHistory.map((board, index) => (
-                  <div 
-                    key={index}
-                    className={`flex-shrink-0 p-2 transition-all duration-200 ${
-                      currentBoardIndex === index ? 'border-2 border-blue-500' : ''
-                    }`}
-                  >
-                    <div className="grid grid-cols-5 gap-1">
-                      {board.map((row, i) =>
-                        row.map((color, j) => (
-                          <Cell 
-                            key={`history-${index}-${i}-${j}`} 
-                            color={color}
-                            size="tiny"
-                          />
-                        ))
-                      )}
-                    </div>
+            <div 
+              ref={sliderRef} 
+              className="flex overflow-x-auto transition-all duration-300 ease-in-out"
+              style={{
+                maxWidth: '800px',
+                scrollBehavior: 'smooth',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }}
+            >
+              {boardHistory.map((board, index) => (
+                <div 
+                  key={index}
+                  className={`flex-shrink-0 p-2 transition-all duration-200 ${
+                    currentBoardIndex === index ? 'border-2 border-blue-500' : ''
+                  }`}
+                >
+                  <div className="grid grid-cols-5 gap-0.3">
+                    {board.map((row, i) =>
+                      row.map((color, j) => (
+                        <Cell 
+                          key={`history-${index}-${i}-${j}`} 
+                          color={color}
+                          size="tiny"
+                        />
+                      ))
+                    )}
                   </div>
-                ))}
-              </div>
-
-              <button 
-                onClick={scrollRight}
-                disabled={currentBoardIndex === boardHistory.length - 1}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
-              >
-                →
-              </button>
+                </div>
+              ))}
             </div>
+
+            <button 
+              onClick={scrollRight}
+              disabled={currentBoardIndex === boardHistory.length - 1}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              →
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
       {/* Modal */}
       <Modal 

@@ -9,11 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/styled-components": "^5.1.15",
     "fs": "^0.0.1-security",
     "next": "15.1.7",
     "path": "^0.12.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "styled-components": "^5.3.11",
     "tailwind-scrollbar-hide": "^2.0.0"
   },
   "devDependencies": {
