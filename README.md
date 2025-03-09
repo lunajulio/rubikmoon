@@ -9,6 +9,8 @@
 
 ## Descripción del Proyecto
 
+![Logo](./cubo)
+
 RubikMoon es una aplicación web interactiva diseñada con Next.js y React que permite a los usuarios resolver un puzzle basado en un tablero de 5x5 con una sección objetivo de 3x3. La aplicación utiliza el algoritmo A* para encontrar la solución óptima y guía al usuario paso a paso para resolver el puzzle.
 
 ## Funcionamiento del Algoritmo A*
